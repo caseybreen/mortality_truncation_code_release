@@ -1,0 +1,54 @@
+---
+title: "Gompertztrunc Fits"
+author: Casey Breen
+---
+
+Summary: Create histogram densities and overlay Gompertz fits. 
+
+```{r}
+## library packages 
+library(gompertztrunc)
+library(tidyverse)
+library(data.table)
+library(broom)
+```
+
+
+## We simulate without any cohort distinctions
+
+```{r}
+dmf <- fread("../data/censoc_dmf_v2_linked.csv") %>% 
+  select(byear, dyear, death_age, EDUCD, HISTID, MARST, weight_conservative, link_abe_exact_conservative)
+
+dmf_1910 <- dmf %>% 
+  filter(byear == 1910) %>%  
+  filter(link_abe_exact_conservative == 1) %>% 
+  filter(!EDUCD %in%  c(0, 999)) %>% 
+  censocdev::recode_education(educ = EDUCD) %>% 
+  mutate(hs = case_when(
+    educ_yrs >= 12 ~ "High School", 
+    TRUE ~ "No High School"
+  )) %>% 
+  mutate(MARST = as.factor(MARST))
+```
+
+```{r}
+gradient <- gompertz_mle(formula = death_age ~ hs, data = dmf_1910, left_trunc = 1975, right_trunc = 2005) 
+```
+
+```{r}
+model_plot <- diagnostic_plot(object = gradient, data = dmf_1910,
+                covar = "hs", death_var = "death_age", xlim=c(50,100)) + 
+  ggplot2::scale_color_manual(name = "", 
+        values = c(Modeled = "black")) +
+  labs(title = "CenSoc-DMF Cohort of 1910")
+
+model_plot_hazards <- diagnostic_plot_hazard(object = gradient, data = dmf_1910,
+                covar = "hs", death_var = "death_age", xlim=c(65,95))
+
+combined_hazards <- cowplot::plot_grid(model_plot, model_plot_hazards, labels = "auto", nrow = 2)
+
+ggsave(plot = combined_hazards, filename = "../figures/histograms_and_hazards.png", width = 10, height = 11)
+```
+
+
