@@ -1,0 +1,137 @@
+---
+title: "R Notebook"
+author: Casey Breen 
+---
+
+Summary: MLE Code to estimate association between age of death and education 
+
+
+```{r}
+## library packages 
+library(data.table)
+library(tidyverse)
+library(broom) 
+library(socviz)
+library(cowplot)      
+library(ggsci)
+source("gompertz_functions.R")
+```
+
+
+
+```{r}
+## read in prelinked CenSoc datasets and filter to "conservative" matches 
+dmf <- fread("/data/josh/CenSoc/censoc_data/censoc_linked_to_census/v2.1/censoc_dmf_v2.1_linked.csv") %>% 
+   filter(link_abe_exact_conservative == 1)
+
+numident <- fread("/data/josh/CenSoc/censoc_data/censoc_linked_to_census/v2.1/censoc_numident_v2.1_linked.csv") %>% 
+   filter(link_abe_exact_conservative == 1)
+```
+
+
+
+```{r}
+## function to recode the IPUMS education code to years of educaiton 
+recode_education <- function(df) {
+  df <- df  %>%
+    mutate(educ_yrs = case_when(
+      EDUCD == 2 ~ 0,
+      EDUCD == 14 ~ 1,
+      EDUCD == 15~  2,
+      EDUCD == 16 ~ 3,
+      EDUCD == 17 ~ 4,
+      EDUCD == 22 ~ 5,
+      EDUCD == 23 ~ 6,
+      EDUCD == 25 ~ 7,
+      EDUCD == 26 ~ 8,
+      EDUCD == 30 ~ 9,
+      EDUCD == 40 ~ 10,
+      EDUCD == 50 ~ 11,
+      EDUCD == 60 ~ 12,
+      EDUCD == 70 ~ 13,
+      EDUCD == 80 ~ 14,
+      EDUCD == 90 ~ 15,
+      EDUCD == 100 ~ 16,
+      EDUCD == 111 ~ 17,
+      EDUCD == 112 ~ 17,
+      EDUCD == 113 ~ 17
+    ))
+  return(df)
+}
+
+## recode dmf education variable 
+dmf <- dmf %>% 
+  recode_education() %>% 
+  filter(!is.na(educ_yrs)) 
+
+## recode dmf education variable 
+dmf_1988_2005 <- dmf %>% 
+ filter(dyear %in% c(1988:2005))
+
+## recode numident education variable 
+numident <- numident %>% 
+  recode_education() %>% 
+  filter(!is.na(educ_yrs))
+```
+
+
+```{r}
+dmf_1910_lm <- tidy(lm(death_age ~ educ_yrs + as.factor(byear), weights = weight, data = dmf %>% filter(byear %in% 1905:1914) %>% sample_n(100000))) %>% mutate(dataset = "DMF (1975-2005)")
+dmf_1910_restrict_lm <- tidy(lm(death_age ~ educ_yrs + as.factor(byear), weights = weight, data = dmf_1988_2005 %>% filter(byear %in% 1905:1914) %>% sample_n(100000))) %>% mutate(dataset = "DMF (1988-2005)")
+numident_1910_lm  <- tidy(lm(death_age ~ educ_yrs + as.factor(byear), weights = weight, data = numident %>% filter(byear %in% c(1905:1914) & sex == 1) %>% sample_n(100000))) %>% mutate(dataset = "Numident (1988-2005)")
+```
+
+
+```{r}
+dmf_1910 <- gompertztrunc::gompertz_mle(death_age ~ educ_yrs, data = dmf %>% filter(byear %in% 1905:1914) , weights = weight) 
+
+dmf_1910_e65 <- gompertztrunc::convert_hazards_to_ex(dmf_1910$results) %>% 
+  mutate(dataset = "DMF (1975-2005)")
+```
+
+```{r}
+dmf_1910_1988_2005 <- gompertztrunc::gompertz_mle(death_age ~ educ_yrs, data = dmf_1988_2005 %>% filter(byear %in% 1905:1914), left_trunc = 1988, right_trunc = 2005, weights = weight) 
+
+dmf_1910_1988_2005_e65 <- gompertztrunc::convert_hazards_to_ex(dmf_1910_1988_2005$results) %>% 
+  mutate(dataset = "DMF (1988-2005)")
+```
+
+```{r}
+numident_1910 <- gompertztrunc::gompertz_mle(death_age ~ educ_yrs, data = numident %>% filter(byear %in% 1905:1914 & sex == 1), left_trunc = 1988, right_trunc = 2005, weights = weight) 
+
+numident_1910_e65 <- gompertztrunc::convert_hazards_to_ex(numident_1910$results) %>% 
+    mutate(dataset = "Numident (1988-2005)")
+```
+
+
+```{r}
+lm_results <- dmf_1910_lm %>% 
+  bind_rows(dmf_1910_restrict_lm) %>% 
+  bind_rows(numident_1910_lm) %>% 
+  filter(term == "educ_yrs") %>% 
+  mutate(method = "Regression on Age of Death") %>% 
+  mutate(e65 = estimate,
+         e65_lower = estimate - 1.96*std.error,
+         e65_upper = estimate + 1.96*std.error)
+  
+  
+gompertz_results <- dmf_1910_e65 %>% 
+  bind_rows(dmf_1910_1988_2005_e65) %>% 
+  bind_rows(numident_1910_e65) %>% 
+  mutate(method = "Parametric Gompertz (Accounting for Truncation)")
+
+gompertz_results %>% 
+  bind_rows(lm_results) %>% 
+  ggplot(aes(x = dataset, y = e65, ymin = e65_lower, ymax = e65_upper, color = method, shape = method)) + 
+  geom_pointrange(position = position_dodge2(width = .1)) + 
+  theme_cowplot() + 
+  scale_shape_manual(values = c(1, 2)) +
+  theme(legend.position = "bottom", legend.title=element_blank()) + 
+  labs(x = "",
+       y = "estimate",
+       title = "Association Between Education (Years) and Longevity",
+       subtitle = "Men, birth cohorts of 1910") + 
+  ggsci::scale_color_lancet() + 
+  ylim(0, .4)
+```
+
