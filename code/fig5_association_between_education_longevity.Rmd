@@ -120,7 +120,7 @@ gompertz_results <- dmf_1910_e65 %>%
   bind_rows(numident_1910_e65) %>% 
   mutate(method = "Parametric Gompertz (Accounting for Truncation)")
 
-gompertz_results %>% 
+education_assocation_plot <- gompertz_results %>% 
   bind_rows(lm_results) %>% 
   ggplot(aes(x = dataset, y = e65, ymin = e65_lower, ymax = e65_upper, color = method, shape = method)) + 
   geom_pointrange(position = position_dodge2(width = .1)) + 
@@ -133,5 +133,7 @@ gompertz_results %>%
        subtitle = "Men, birth cohorts of 1910") + 
   ggsci::scale_color_lancet() + 
   ylim(0, .4)
+
+ggsave(plot = education_assocation_plot, filename = "../figures/education_association.png", height = 6, width = 8)
 ```
 
