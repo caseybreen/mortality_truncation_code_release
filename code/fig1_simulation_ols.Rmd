@@ -6,6 +6,7 @@ author: Casey Breen
 
 
 ```{r}
+## library packages 
 library(tidyverse)
 library(gompertztrunc)
 library(cowplot)
@@ -14,11 +15,12 @@ library(broom)
 
 
 ```{r}
+
 set.seed(5)
 results <- list()
 i = 1
 
-
+## set seed results 
 for (start_year in c(1865:1880)) for (window_width in c(1:30)) {
 
   

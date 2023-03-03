@@ -1,0 +1,108 @@
+---
+title: "Code to replicate Figure 6"
+author: Maria Osborne
+---
+
+Title: Code to replicate Figure 6. 
+
+```{r}
+## Figure 6: HR estimates with shifting observation window
+
+## Packages
+library(tidyverse)
+library(gompertztrunc)
+library(data.table)
+
+## Read in Data
+censoc_num <- fread("/data/josh/CenSoc/censoc_data/censoc_linked_to_census/censoc_numident_v2_linked.csv",
+                    select = c('byear', 'dyear', 'death_age', 'link_abe_exact_conservative',
+                               'weight', 'weight_conservative', 'EDUCD', 'sex'))
+
+## Limit sample
+censoc_num <- censoc_num %>% filter(link_abe_exact_conservative == 1, byear == 1910,
+                                    EDUCD != 0 & EDUCD != 999, sex == 1)
+
+## create education variable
+censoc_num <- censoc_num %>%
+  mutate(edu = case_when(EDUCD == 2 ~ 0,
+                         EDUCD == 12 ~ 0,
+                         EDUCD == 14 ~ 1,
+                         EDUCD == 15 ~ 2,
+                         EDUCD == 16 ~ 3,
+                         EDUCD == 17 ~ 4,
+                         EDUCD == 22 ~ 5,
+                         EDUCD == 23 ~ 6,
+                         EDUCD == 25 ~ 7,
+                         EDUCD == 26 ~ 8,
+                         EDUCD == 30 ~ 9,
+                         EDUCD == 40 ~ 10,
+                         EDUCD == 50 ~ 11,
+                         EDUCD == 60 ~ 12,
+                         EDUCD == 70 ~ 13,
+                         EDUCD == 80 ~ 14,
+                         EDUCD == 90 ~ 15,
+                         EDUCD == 100 ~ 16,
+                         EDUCD %in% c(110,111,112,113) ~ 17))
+
+
+## create dataframe to store estimates in
+df_real_1910 <- data.frame()
+
+## Loop over observation bounds
+for(start_year in c(1988:2003)) {
+  for (end_year in c((start_year+2):2005)) {  
+    data_truncated <- censoc_num %>% filter(dyear %in% start_year:end_year)
+    
+    window_length_yrs <- (end_year - start_year) + 1
+    min_age <- min(data_truncated$death_age) + 1
+    max_age <-  max(data_truncated$death_age) - 1
+    window_length_age <- (max_age - min_age) + 1 
+    
+    # run gompertzmle()
+    model <- gompertztrunc::gompertz_mle(formula = death_age ~ edu, data = data_truncated, 
+                                         left_trunc = start_year, right_trunc =end_year)
+    
+    ests <- model$results %>% filter(parameter == "edu")
+    gb <- (model$results %>% filter(parameter=='gompertz_b'))$coef
+    gm <- (model$results %>% filter(parameter=='gompertz_mode'))$coef
+    did_converge <- model$optim_fit$convergence == 0
+    
+    ests <- ests %>% mutate(start_year = start_year, end_year = end_year, convergence = did_converge,
+                            contains_mode = contains_mode, min_age = min_age, max_age = max_age,
+                            wl_year = window_length_yrs, wl_age = window_length_age,
+                            gompertz_b = gb, gompertz_mode = gm)
+    
+    df_real_1910 <- rbind(df_real_1910, ests)
+    
+  }
+}
+
+## "True" (Best) estimate of hazard ratio (broadest age band)
+true_hr_1910 <- 0.9673656
+
+## add mode boolean
+df_real_1910 <- df_real_1910 %>% 
+  mutate(is_bad = (true_hr_1910 < hr_lower | true_hr_1910 > hr_upper)) %>% 
+  mutate(contains_mode = min_age <= 84 & max_age >= 84) %>% 
+  mutate(is_bad = ifelse(is_bad == TRUE, "No", "Yes")) %>% 
+  mutate(is_bad = relevel(as.factor(is_bad), ref = "Yes"))
+
+
+## plot
+df_real_1910 %>% 
+  ggplot(aes(x=as.factor(min_age), y = as.factor(wl_age))) +
+  geom_tile(color='white', lwd=0.7, aes(fill = is_bad)) + # fill = 'gray85') + 
+  geom_text(aes(label=round(hr, 2)), size = 3.2, family = "serif") +
+  theme_bw() +
+  scale_fill_manual(values = c('grey90', 'grey65')) +
+  theme(#line = element_blank(),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x='Starting Age', y= 'Width of Window (Years)', fill='Window \nCaptures \nBest \nEstimate') 
+
+
+ggsave(filename = 'fig7_width_of_window_redone.png',
+       path = "/hdir/0/mariaosborne/censoc/PRPR paper replication",
+       units = 'in', height = 5, width=8)
+
+```
+

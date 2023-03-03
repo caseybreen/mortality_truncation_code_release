@@ -1,0 +1,76 @@
+---
+title: "Regression Example"
+author: Joshua R. Goldstein 
+---
+
+
+```{r}
+## library package 
+library(flexsurv)
+
+## set seed 
+set.seed(9999)
+```
+
+```{r}
+## set parameters 
+N = 100
+z <- rnorm(N, 0, 1)
+b = -.5
+alpha = 0.5 * 10^-4 
+beta = 1/10
+y <- rgompertz(N, shape = beta, rate = alpha * exp(z*b))
+par(mfrow = c(1,1))
+plot(z, y, col = "grey")
+
+## true regression line
+m <- lm(y ~ z)
+abline(m, col = "black")
+
+## truncated
+L = 60
+R = 75
+abline(h = c(L, R), col = "grey")
+mt <- lm(y ~ z, subset = L < y & y < R)
+abline(mt, lty = 2, col = "black")
+
+## black observed points
+s = L < y & y < R
+points(z[s], y[s])
+
+## let's do as with OLS and normal x
+set.seed(2)
+N = 100
+x = rnorm(N, 100, 5)
+b = .5
+eps <- rnorm(N, 0, 5)
+y = 30 + b*x + eps
+pdf("../figures/flash_simu_fig.pdf", width = 7, height = 4)
+par(mfrow = c(1,2))
+plot(x,y, col = "black",
+          xlab = "covariate",
+     ylab = "death age")
+m <- lm(y ~ x)
+abline(m, lty = 1, col = "black", lwd = 2)
+title("True slope = 0.45")
+
+## create plot 
+plot(x,y, col = "black",
+     xlab = "covariate",
+     ylab = "death age")
+m <- lm(y ~ x)
+abline(m, lty = 1, col = "black")
+L = 75
+R = 85
+s = L < y & y < R
+mt <- lm(y ~ x, subset = s)
+abline(mt, lty = 1, col = "red", lwd = 2)
+abline(h = c(L, R), lty = 3, col = "red")
+points(x[s], y[s], pch = 19, cex = .5, col = "red")
+title("Truncated slope = 0.15", col.main = "red")
+dev.off()
+system("open flash_simu_fig.pdf")
+
+```
+
+
