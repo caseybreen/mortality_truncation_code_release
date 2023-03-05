@@ -1,6 +1,6 @@
 ## Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records
 
-This repository contains code and materials to replicate ["NMortality Modeling of Partially Observed Cohorts Using Administrative Death Records."](https://https://doi.org/10.31235/osf.io/efdzh)
+This repository contains code and materials to replicate ["Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records."](https://https://doi.org/10.31235/osf.io/efdzh)
 
 ### Replication Package
 
@@ -27,16 +27,16 @@ After downloading the required data and moving into the top level of the replica
 Alternatively, researchers can run each script individually in any order. 
 
 - `fig1_simulation_ols_window_width.Rmd` - generates Figure 1, which illustrates the bias of OLS regression under double truncation using a simulation study. 
-- `fig2_regression_example.Rmd` - generates Figure 2, which provides an illustration of why regression on age of death can be biased under double truncation 
+- `fig2_regression_example.Rmd` - generates Figure 2, which provides an illustration of why regression on age of death can be biased under double truncation. 
 - `fig3_sweden_example.Rmd` - generates Figure 3, which gives an example of estimated mortality differentials between men and women in Sweden (using HMD data) under truncation and not under truncation. 
-- `fig4_censoc_dmf_1910_diagnostics.Rmd` - generates Figure 4, which provides graphical diagnostics from the Gompertztrunc package 
-- `fig5_association_between_education_longevity.Rmd` - generates Figure 5, which shows the estimated association between education and longevity estimated from OLS regression and from our Gompertz MLE approach
+- `fig4_censoc_dmf_1910_diagnostics.Rmd` - generates Figure 4, which applies graphical diagnostics from the Gompertztrunc package to a case study of the relationship between education and longevity. 
+- `fig5_association_between_education_longevity.Rmd` - generates Figure 5, which shows the estimated association between education and longevity estimated from OLS regression and from our Gompertz MLE approach. 
 - `fig6_simulation_window_numident.Rmd` - generates Figure 6, which simulates different windows widths of mortality observation and its effect on estimates from our Gompertz MLE approach. 
 
 ### Authors
 
 - [Joshua R. Goldstein](https://jrgoldstein.com/)
-- [Casey Breen](caseybreen.com)
+- [Casey F. Breen](caseybreen.com)
 - [Serge Atherwood](https://satherwood.wordpress.com/)
 - Maria Osborne
 
