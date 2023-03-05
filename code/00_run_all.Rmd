@@ -1,0 +1,31 @@
+---
+title: "Run all Scripts"
+author: Casey Breen
+---
+
+## Summary 
+
+This script runs all code to replicate figures and tables for the paper "Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records." 
+
+The scripts are numbered in the order they should be run.
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## list of rmd files 
+rmd_files <- list.files(path = file.path(here("code//")), pattern=".Rmd")   
+rmd_files <- rmd_files[!rmd_files %in% "00_run_all.Rmd"]
+
+## set seed for reproducibility 
+set.seed(1)
+for (cur_file in rmd_files) {
+	cat("================================\n")
+	tictoc::tic(glue::glue("Finished with {cur_file}, time:"))
+	cat("Running ", cur_file, "\n")
+  	source_rmd(cur_file)
+  	tictoc::toc()
+	cat("================================\n")
+}
+```

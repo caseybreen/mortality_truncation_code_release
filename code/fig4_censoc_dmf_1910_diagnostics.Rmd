@@ -1,137 +1,71 @@
 ---
-title: "Gompertztrunc Fits"
+title: "Figure 4 - CenSoc DMF 1910 Diagnostics"
 author: Casey Breen
 ---
 
-Summary: Create histogram densities and overlay Gompertz fits. 
+Summary: This .Rmd file contains code to replicate Figure 4 in "Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records." 
+
+Description of Figure 4: For CenSoc-DMF cohort of 1910: panel (a) shows a histogram of age of death for those who did and did not complete high school; the black curves shows our Gompertz-model based estimates of the number of deaths.  Panel (b) plots the model-based hazard ratio estimates (solid lines) vs. the inferred observed hazard ratios (dashed lines) for those who completed high school (blue) and those who did not (red).
+
 
 ```{r}
-## library packages 
+## library packages
 library(gompertztrunc)
 library(tidyverse)
 library(data.table)
 library(broom)
+library(here)
+source("helpers.R")
 ```
 
 
 ## We simulate without any cohort distinctions
 
 ```{r}
-dmf <- fread("../data/censoc_dmf_v2_linked.csv") %>% 
-  select(byear, dyear, death_age, EDUCD, HISTID, MARST, weight_conservative, link_abe_exact_conservative)
+## read in censoc_dmf_v2_linked.csv
+dmf <- fread(here("data/censoc_dmf_v2.1_linked_extract.csv"))
 
-dmf_1910 <- dmf %>% 
-  filter(byear == 1910) %>%  
-  filter(link_abe_exact_conservative == 1) %>% 
-  filter(!EDUCD %in%  c(0, 999)) %>% 
-  censocdev::recode_education(educ = EDUCD) %>% 
+## filter to the year 1910
+dmf_1910 <- dmf %>%
+  filter(byear == 1910) %>%
+  filter(link_abe_exact_conservative == 1) %>%
+  filter(!EDUCD %in% c(0, 999)) %>%
+  recode_education() %>%
   mutate(hs = case_when(
-    educ_yrs >= 12 ~ "High School", 
+    educ_yrs >= 12 ~ "High School",
     TRUE ~ "No High School"
-  )) %>% 
+  )) %>%
   mutate(MARST = as.factor(MARST))
 ```
 
 ```{r}
-gradient <- gompertz_mle(formula = death_age ~ hs, data = dmf_1910, left_trunc = 1975, right_trunc = 2005) 
-```
+## estimate gradient
+gradient <- gompertz_mle(formula = death_age ~ hs, data = dmf_1910, left_trunc = 1975, right_trunc = 2005)
 
-```{r}
-model_plot <- diagnostic_plot(object = gradient, data = dmf_1910,
-                covar = "hs", death_var = "death_age", xlim=c(50,100)) + 
-  ggplot2::scale_color_manual(name = "", 
-        values = c(Modeled = "black")) +
+## diagnostic plots of curve fitting
+model_plot <- diagnostic_plot(
+  object = gradient, data = dmf_1910,
+  covar = "hs", death_var = "death_age", xlim = c(50, 100)
+) +
+  ggplot2::scale_color_manual(
+    name = "",
+    values = c(Modeled = "black")
+  ) +
   labs(title = "CenSoc-DMF Cohort of 1910")
 
-model_plot_hazards <- diagnostic_plot_hazard(object = gradient, data = dmf_1910,
-                covar = "hs", death_var = "death_age", xlim=c(65,95))
+## diagnostic plots of model hazards
+model_plot_hazards <- diagnostic_plot_hazard(
+  object = gradient, data = dmf_1910,
+  covar = "hs", death_var = "death_age", xlim = c(65, 95)
+)
 
+## combine plots
 combined_hazards <- cowplot::plot_grid(model_plot, model_plot_hazards, labels = "auto", nrow = 2)
 
-ggsave(plot = combined_hazards, filename = "../figures/histograms_and_hazards.png", width = 10, height = 11)
+## save ggplots
+ggsave(
+  plot = combined_hazards,
+  filename = here("figures/fig4-histograms_and_hazards.png"),
+  width = 10, height = 11
+)
 ```
-
-```{r}
-function (data, object, covar, death_var = "death_age", byear_var = "byear", 
-    xlim = c(65, 110)) 
-{
-    if (!(is.factor(data[[covar]]) | is.character(data[[covar]]))) {
-        stop("Covariate must be a factor or character variable")
-    }
-    if (length(unique(data[[byear_var]])) > 1) {
-        stop("Data and model can only include a single birth cohort")
-    }
-    death_age <- NULL
-    data <- data %>% dplyr::rename(death_age = !!death_var) %>% 
-        dplyr::mutate(death_age = floor(death_age))
-    counter = 1
-    death_counts <- list()
-    death_counts_modeled <- list()
-    cov_levels <- levels(as.factor(data[[covar]]))
-    b <- object$results$coef[[1]]
-    M <- object$results$coef[[2]]
-    parameter <- NULL
-    hr <- object$results %>% dplyr::filter(parameter == !!covar) %>% 
-        dplyr::select(hr) %>% as.numeric()
-    hx <- hx_calc(b = b, M = M, x = 0:121 + 0.5)
-    lx <- c(1, lx_calc(hx))
-    dx <- dx_calc(1, lx)
-    deaths <- tibble::tibble(dx, death_age = 0:122) %>% dplyr::filter(!is.na(dx))
-    bounds <- data %>% dplyr::summarize(min(death_age) + 1, max(death_age) - 
-        1) %>% as.numeric()
-    deaths_sim <- deaths %>% dplyr::filter(death_age >= bounds[[1]] & 
-        death_age <= bounds[[2]]) %>% dplyr::summarize(sum(dx)) %>% 
-        as.numeric()
-    deaths_real <- data %>% dplyr::filter(get(covar) == cov_levels[1]) %>% 
-        dplyr::filter(death_age >= bounds[[1]] & death_age <= 
-            bounds[[2]]) %>% dplyr::summarize(dplyr::n()) %>% 
-        as.numeric()
-    multiplier <- deaths_real/deaths_sim
-    dx <- dx_calc(multiplier, lx)
-    deaths <- tibble::tibble(dx, death_age = 0:122) %>% dplyr::filter(!is.na(dx))
-    death_counts_modeled[[counter]] <- deaths %>% dplyr::mutate(`:=`(!!covar, 
-        cov_levels[1]))
-    covariates <- stringr::str_remove(object$results$parameter[3:length(object$results$parameter)], 
-        pattern = covar)
-    for (cov in covariates) {
-        counter = counter + 1
-        hr <- object$results %>% dplyr::mutate(parameter = stringr::str_remove(parameter, 
-            pattern = covar)) %>% dplyr::filter(parameter == 
-            !!cov) %>% dplyr::select(hr) %>% as.numeric()
-        hx <- hr * hx_calc(b = b, M = M, x = 0:121 + 0.5)
-        lx <- c(1, lx_calc(hx))
-        dx <- dx_calc(1, lx)
-        deaths <- tibble::tibble(dx, death_age = 0:122) %>% dplyr::filter(!is.na(dx))
-        bounds <- data %>% dplyr::summarize(min(death_age) + 
-            1, max(death_age) - 1) %>% as.numeric()
-        deaths_sim <- deaths %>% dplyr::filter(death_age >= bounds[[1]] & 
-            death_age <= bounds[[2]]) %>% dplyr::summarize(sum(dx)) %>% 
-            as.numeric()
-        deaths_real <- data %>% dplyr::filter(get(covar) == cov) %>% 
-            dplyr::filter(death_age >= bounds[[1]] & death_age <= 
-                bounds[[2]]) %>% dplyr::summarize(dplyr::n()) %>% 
-            as.numeric()
-        multiplier <- deaths_real/deaths_sim
-        dx <- dx_calc(multiplier, lx)
-        deaths <- tibble::tibble(dx, death_age = 0:122) %>% dplyr::filter(!is.na(dx))
-        death_counts_modeled[[counter]] <- deaths %>% dplyr::mutate(`:=`(!!covar, 
-            covariates[[counter - 1]]))
-    }
-    death_counts_modeled <- dplyr::bind_rows(death_counts_modeled) %>% 
-        dplyr::rename(var = !!covar)
-    plot <- data %>% dplyr::rename(var = !!covar) %>% dplyr::filter(death_age >= 
-        bounds[[1]] & death_age <= bounds[[2]]) %>% ggplot2::ggplot() + 
-        ggplot2::geom_histogram(ggplot2::aes(x = death_age), 
-            binwidth = 1, color = "black", fill = "grey", na.rm = TRUE) + 
-        cowplot::theme_cowplot() + ggplot2::geom_line(data = death_counts_modeled, 
-        ggplot2::aes(x = death_age, y = dx, color = "Modeled"), 
-        size = 1, linetype = "dashed", na.rm = TRUE) + ggplot2::labs(x = "Death Age", 
-        y = "n", title = "") + ggplot2::scale_color_manual(name = "", 
-        values = c(Modeled = "blue")) + ggplot2::theme(legend.position = "bottom", 
-        legend.key.width = grid::unit(1.5, "cm")) + ggplot2::labs(x = "Death Age", 
-        y = "n") + ggplot2::xlim(xlim) + ggplot2::facet_wrap(~var, 
-        scales = "free")
-    return(plot)
-}
-```
-

@@ -1,0 +1,178 @@
+---
+title: "Fig 1 - OLS Simulation"
+author: Casey Breen 
+---
+
+Summary: This .Rmd file contains code to replicate Figure 1 in "Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records." 
+
+Description of Figure 1: The ratio of truncated to untruncated regression statistics: standard errors (panel a), regression coefficients (panel b), and t-statistics (panel c) for different truncation windows. A value of 1 corresponds to the truncated and untruncated statistic having the same value; values less than 1 correspond to the truncated statistic being smaller than the untruncated statistic.
+
+```{r}
+## library packages
+library(tidyverse)
+library(gompertztrunc)
+library(cowplot)
+library(broom)
+library(here)
+
+## Set
+set.seed(5)
+```
+
+
+```{r}
+## create list to store results
+results <- list()
+i <- 1
+
+## Simulate difference truncation windows, systematically varying the start year and the width of the window
+for (start_year in c(1865:1880)) {
+  for (window_width in c(1:30)) {
+    ## smulate death distribution
+    sim_data <- gompertztrunc::gompertztrunc_simu(n = 200000, formula = death_age ~ sex, coefs = c("sex" = -0.2), dummy = c(TRUE)) %>%
+      mutate(byear = 1800) %>%
+      mutate(dyear = byear + floor(death_age))
+
+    ## filter death distribution to be within window
+    sim_data_trunc <- sim_data %>%
+      filter(dyear >= start_year & dyear <= start_year + window_width)
+
+    ## estimate adjustment factor
+    adj_factor <- 200000 / nrow(sim_data_trunc)
+
+    ## simulate gompertz distribution
+    sim_data <- gompertztrunc::gompertztrunc_simu(n = adj_factor * 200000, formula = death_age ~ sex, coefs = c("sex" = -0.2), dummy = c(TRUE)) %>%
+      mutate(byear = 1800) %>%
+      mutate(dyear = byear + floor(death_age))
+
+    ## truncate data
+    sim_data_trunc <- sim_data %>%
+      filter(dyear >= start_year & dyear <= start_year + window_width)
+
+    ## fit linear model
+    lm_model <- lm(death_age ~ sex, data = sim_data_trunc)
+
+    ## store results
+    results[[i]] <- tibble(
+      coef = summary(lm_model)$coefficients["sex", "Estimate"],
+      se = summary(lm_model)$coefficients["sex", "Std. Error"],
+      start_year = start_year,
+      window_width = window_width,
+      n = nrow(sim_data_trunc)
+    )
+
+
+    i <- i + 1
+    cat(i)
+  }
+}
+
+## simulate gompertz window
+sim_data <- gompertztrunc::gompertztrunc_simu(n = 365000, formula = death_age ~ sex, coefs = c("sex" = -0.2), dummy = c(TRUE)) %>%
+  mutate(byear = 1800) %>%
+  mutate(dyear = byear + floor(death_age))
+
+## filter to death ages over 65
+sim_data <- sim_data %>%
+  filter(death_age > 65)
+
+## rerun second model
+lm_model2 <- lm(death_age ~ sex, data = sim_data)
+
+## estimate coefficients of the linear model
+untruncated_regression <- tibble(
+  coef = summary(lm_model2)$coefficients["sex", "Estimate"],
+  se = summary(lm_model2)$coefficients["sex", "Std. Error"],
+  start_year = start_year,
+  window_width = window_width,
+  n = nrow(sim_data_trunc),
+  t_stat = coef / se
+)
+
+##
+data_forplot <- bind_rows(results) %>%
+  ungroup() %>%
+  mutate(t = coef/se) %>% 
+  mutate(
+    se = se / untruncated_regression$se,
+    t = t / untruncated_regression$t_stat,
+    coef = coef / 0.986
+  )
+
+## plot standard errors
+plota <- ggplot(data_forplot, aes(x = start_year - 1800, y = window_width)) +
+  geom_tile(aes(fill = se)) +
+  scale_fill_viridis_c(option = "magma") +
+  cowplot::theme_minimal_hgrid(15) +
+  labs(
+    y = "Width of Window (Years)",
+    x = "Starting Age",
+    fill = "SE / SE (untruncated)",
+    title = "Standard Errror",
+    caption = ""
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2.5, "cm")
+  )
+
+## plot coefficients
+plotb <- ggplot(data_forplot, aes(x = start_year - 1800, y = window_width)) +
+  geom_tile(aes(fill = coef)) +
+  scale_fill_viridis_c(option = "magma") +
+  cowplot::theme_minimal_hgrid(15) +
+  labs(
+    y = "Width of Window (Years)",
+    x = "Starting Age",
+    fill = "Coef / Coef (untruncated)",
+    title = "Regression Coefficient"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2.5, "cm")
+  )
+
+## plot t-statistic
+plotc <- ggplot(data_forplot, aes(x = start_year - 1800, y = window_width)) +
+  geom_tile(aes(fill = t)) +
+  scale_fill_viridis_c(option = "magma") +
+  cowplot::theme_minimal_hgrid(15) +
+  labs(
+    y = "Width of Window (Years)",
+    x = "Starting Age",
+    fill = "T-Stat / T-Stat (untruncated)",
+    title = "T-Statistic"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2.5, "cm")
+  )
+
+## create combined plot
+plot_sim <- cowplot::plot_grid(plotb, plota, plotc, ncol = 1, labels = "auto")
+
+title <- ggdraw() +
+  draw_label(
+    "OLS under Double Truncation",
+    fontface = "bold",
+    x = 0,
+    hjust = 0,
+    vjust = 2.5,
+    size = 22
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 0)
+  )
+
+plot_sim_title <- plot_grid(
+  title, plot_sim,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1)
+)
+
+## save plot
+ggsave(plot_sim_title, filename = here("figures/fig1-simulated_window_widths.png"), height = 17, width = 10)
+```

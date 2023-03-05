@@ -1,39 +1,46 @@
 ---
-title: ""
-author: Joshua R. Goldstein and Casey Breen
+title: "Figure 3 - Sweden Example"
+author: Joshua R. Goldstein
 ---
 
-```{r}
-## library packages 
-library(data.table)
+Summary: This .Rmd file contains code to replicate Figure 3 in "Mortality Modeling of Partially Observed Cohorts Using Administrative Death Records." 
 
-## match code 
+Description of Figure 3: Swedish deaths over 65 for male and female cohorts born in 1900. Data are from the Human Mortality Database. The top panel shows the full distribution and the mean ages of death. The middle panel shows an artificially truncated age window covering ages 80 through 89 and the mean ages within this window. The bottom panel shows the results of fitting a Gompertz curve to the truncated observations using maximum likelihood and the estimates of the implied untruncated means. The estimates are very close to the actual values, and the estimated magnitude of the sex difference in $e(65)$ is correct.
+
+
+```{r}
+## library packages
+library(data.table)
+library(here)
+library(tidyverse)
+
+## source additional code
+source("helpers.R")
+
+## match code
 dt.m <- fread("../data/SWE.mltcoh_1x1.txt")
 dt.f <- fread("../data/SWE.fltcoh_1x1.txt")
 ```
 
 ```{r}
 ## hmd example of male and female differences for cohort of 1900
-source("gomp_verify.R")
-
-boycol = "blue"
-girlcol = "red"
+boycol <- "blue"
+girlcol <- "red"
 
 
 lt.f <- dt.f[Year == 1900]
 dx.f <- lt.f$dx
-names(dx.f) = 0:110
+names(dx.f) <- 0:110
 lt.m <- dt.m[Year == 1900]
 dx.m <- lt.m$dx
-names(dx.m) = 0:110
+names(dx.m) <- 0:110
 
 
-get.trunc.mean <- function(dx)
-{
-    x = as.numeric(names(dx)) + .5
-    dx <- dx/sum(dx)
-    m = sum(dx * x)
-    m
+get.trunc.mean <- function(dx) {
+  x <- as.numeric(names(dx)) + .5
+  dx <- dx / sum(dx)
+  m <- sum(dx * x)
+  m
 }
 
 get.trunc.mean(dx.m[paste(65:110)])
@@ -43,48 +50,59 @@ as.numeric(lt.m[Age == "65"]$ex) + 65
 
 ## difference age 65:110
 d.e65 <- get.trunc.mean(dx.f[paste(65:110)]) -
-    get.trunc.mean(dx.m[paste(65:110)])
+  get.trunc.mean(dx.m[paste(65:110)])
 ## [1] 3.537235
 
-my.x = 80:89
+my.x <- 80:89
 d.obs.75to84 <-
-    get.trunc.mean(dx.f[paste(my.x)]) -s
-    get.trunc.mean(dx.m[paste(my.x)])
+  get.trunc.mean(dx.f[paste(my.x)]) - s
+get.trunc.mean(dx.m[paste(my.x)])
 ## [1] 0.4000638
 
-dx.f.65.norm <- dx.f[65:110]/sum(dx.f[65:110])
-dx.m.65.norm <- dx.m[65:110]/sum(dx.m[65:110])
+dx.f.65.norm <- dx.f[65:110] / sum(dx.f[65:110])
+dx.m.65.norm <- dx.m[65:110] / sum(dx.m[65:110])
 
-pdf("../figures/hmd_example_fig.pdf", height = 8, width = 7)
-par(mfrow = c(3,1))
+png(here("figures/fig3_hmd_example_fig.png"), height = 8, width = 7, units = "in", res = 300)
+par(mfrow = c(3, 1))
 ## age 65+
-plot(65:110, dx.f[paste(65:110)], pch = 19, col = girlcol,
-     xlab = "Age", ylab = "Deaths")
-points(65:110, dx.m[paste(65:110)], pch = 19, col = boycol,
-       xlab = "Age", ylab = "Deaths")
+plot(65:110, dx.f[paste(65:110)],
+  pch = 19, col = girlcol,
+  xlab = "Age", ylab = "Deaths"
+)
+points(65:110, dx.m[paste(65:110)],
+  pch = 19, col = boycol,
+  xlab = "Age", ylab = "Deaths"
+)
 abline(v = get.trunc.mean(dx.f[paste(65:110)]), col = girlcol, lty = 1, lwd = 2)
 abline(v = get.trunc.mean(dx.m[paste(65:110)]), col = boycol, lty = 1, lwd = 2)
-text(x = get.trunc.mean(dx.f[paste(65:110)]),
-     y = 500,
-     round(get.trunc.mean(dx.f[paste(65:110)]),1),
-     pos = 4,
-     col = girlcol)
-text(x = get.trunc.mean(dx.m[paste(65:110)]),
-     y = 500,
-     round(get.trunc.mean(dx.m[paste(65:110)]),1),
-     pos = 2,
-     col = boycol)
+text(
+  x = get.trunc.mean(dx.f[paste(65:110)]),
+  y = 500,
+  round(get.trunc.mean(dx.f[paste(65:110)]), 1),
+  pos = 4,
+  col = girlcol
+)
+text(
+  x = get.trunc.mean(dx.m[paste(65:110)]),
+  y = 500,
+  round(get.trunc.mean(dx.m[paste(65:110)]), 1),
+  pos = 2,
+  col = boycol
+)
 title("Untruncated means, all ages 65+")
 legend("topleft",
-       legend = c("male", "female"),
-       col = c(boycol, girlcol),
-       pch = c(19, 19),
-       bty = "n")
+  legend = c("male", "female"),
+  col = c(boycol, girlcol),
+  pch = c(19, 19),
+  bty = "n"
+)
 
 
 ## age 75:89
-plot(65:110, dx.f[paste(65:110)], pch = 1, col = "grey",
-     xlab = "Age", ylab = "Deaths")
+plot(65:110, dx.f[paste(65:110)],
+  pch = 1, col = "grey",
+  xlab = "Age", ylab = "Deaths"
+)
 points(65:110, dx.m[paste(65:110)], pch = 1, col = "grey")
 points(my.x, dx.m[paste(my.x)], pch = 19, col = boycol)
 points(my.x, dx.f[paste(my.x)], pch = 19, col = girlcol)
@@ -92,42 +110,52 @@ trunc.mean.f <- get.trunc.mean(dx.f[paste(my.x)])
 trunc.mean.m <- get.trunc.mean(dx.m[paste(my.x)])
 abline(v = trunc.mean.f, col = girlcol, lty = 1, lwd = 2)
 abline(v = trunc.mean.m, col = boycol, lty = 1, lwd = 2)
-text(x = trunc.mean.f,
-     y = 500,
-     round(trunc.mean.f,1),
-     pos = 4,
-     col = girlcol)
-text(x = trunc.mean.m,
-     y = 500,
-     round(trunc.mean.m,1),
-     pos = 2,
-     col = boycol)
-title(paste("Truncated means, observed from age",
-            min(my.x), "to", max(my.x)))
+text(
+  x = trunc.mean.f,
+  y = 500,
+  round(trunc.mean.f, 1),
+  pos = 4,
+  col = girlcol
+)
+text(
+  x = trunc.mean.m,
+  y = 500,
+  round(trunc.mean.m, 1),
+  pos = 2,
+  col = boycol
+)
+title(paste(
+  "Truncated means, observed from age",
+  min(my.x), "to", max(my.x)
+))
 
 ####### Now do MLE truncated estimate and show estimated disn in
 ####### dashed lines and the estimated means with dashed lines
 
 
 
-plot(65:110, dx.f[paste(65:110)], pch = 1, col = "grey",
-            xlab = "Age", ylab = "Deaths")
+plot(65:110, dx.f[paste(65:110)],
+  pch = 1, col = "grey",
+  xlab = "Age", ylab = "Deaths"
+)
 points(65:110, dx.m[paste(65:110)], pch = 1, col = "grey")
 points(my.x, dx.m[paste(my.x)], pch = 19, col = boycol)
 points(my.x, dx.f[paste(my.x)], pch = 19, col = girlcol)
 ##  abline(v = get.trunc.mean(dx.f[paste(my.x)]), col = girlcol, lty = 1, lwd = 2)
 ## abline(v = get.trunc.mean(dx.m[paste(my.x)]), col = boycol, lty = 1, lwd = 2)
-title(paste("Unbiased estimation of untruncated means,\n based only on observations from age",
-            min(my.x), "to", max(my.x)))
+title(paste(
+  "Unbiased estimation of untruncated means,\n based only on observations from age",
+  min(my.x), "to", max(my.x)
+))
 ## title("Gompertz MLE estimates of untruncated means based on observations from ")
 
 ## female
 Dx <- dx.f[paste(my.x)]
-x.left = as.numeric(min(names(Dx)))
-x.right = as.numeric(max(names(Dx))) + 1
-out <- counts.trunc.gomp.est(Dx, x.left, x.right, b.start = 1/9, M = 80)
-b.hat = exp(out$par)[1]
-M.hat = exp(out$par)[2]
+x.left <- as.numeric(min(names(Dx)))
+x.right <- as.numeric(max(names(Dx))) + 1
+out <- counts.trunc.gomp.est(Dx, x.left, x.right, b.start = 1 / 9, M = 80)
+b.hat <- exp(out$par)[1]
+M.hat <- exp(out$par)[2]
 Dx.hat.trunc <- get.Dx.hat(dx.f[paste(65:110)], b.hat, M.hat)
 
 ## plot(names(Dx), Dx)
@@ -142,11 +170,11 @@ abline(v = unbias.est.f, lty = 2, col = girlcol)
 
 ## male
 Dx <- dx.m[paste(my.x)]
-x.left = as.numeric(min(names(Dx)))
-x.right = as.numeric(max(names(Dx))) + 1
-out <- counts.trunc.gomp.est(Dx, x.left, x.right, b.start = 1/9, M = 80)
-b.hat = exp(out$par)[1]
-M.hat = exp(out$par)[2]
+x.left <- as.numeric(min(names(Dx)))
+x.right <- as.numeric(max(names(Dx))) + 1
+out <- counts.trunc.gomp.est(Dx, x.left, x.right, b.start = 1 / 9, M = 80)
+b.hat <- exp(out$par)[1]
+M.hat <- exp(out$par)[2]
 Dx.hat.trunc <- get.Dx.hat(dx.m[paste(65:110)], b.hat, M.hat)
 
 ## Dx.hat.trunc <- get.Dx.hat(Dx, b.hat, M.hat)
@@ -159,20 +187,20 @@ summarize.out(out)
 unbias.est.m <- get.trunc.mean(Dx.hat.trunc)
 abline(v = unbias.est.m, lty = 2, col = boycol)
 
-
-text(x = unbias.est.f,
-     y = 500,
-     round(unbias.est.f,1),
-     pos = 4,
-     col = girlcol)
-text(x = unbias.est.m,
-     y = 500,
-     round(unbias.est.m,1),
-     pos = 2,
-     col = boycol)
+## write text
+text(
+  x = unbias.est.f,
+  y = 500,
+  round(unbias.est.f, 1),
+  pos = 4,
+  col = girlcol
+)
+text(
+  x = unbias.est.m,
+  y = 500,
+  round(unbias.est.m, 1),
+  pos = 2,
+  col = boycol
+)
 dev.off()
-system("open hmd_example_fig.pdf")
-
 ```
-
-
