@@ -34,8 +34,7 @@ dmf_1910 <- dmf %>%
   mutate(hs = case_when(
     educ_yrs >= 12 ~ "High School",
     TRUE ~ "No High School"
-  )) %>%
-  mutate(MARST = as.factor(MARST))
+  )) 
 ```
 
 ```{r}
