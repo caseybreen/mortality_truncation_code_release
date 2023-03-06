@@ -34,12 +34,12 @@ numident <- fread(here("data/censoc_numident_v2.1_linked_extract.csv")) %>%
 ## numident results 
 numident_results <-  gompertztrunc::gompertz_mle(death_age ~ educ_yrs, data = numident %>% filter(byear %in% 1910:1920 & sex == 1), left_trunc = 1988, right_trunc = 2005, weights = weight_conservative)
 
-gompertztrunc::convert_hazards_to_ex(numident_results$results, use_model_estimates = T, age = 35)
+gompertztrunc::convert_hazards_to_ex(numident_results$results, age = 35)
   
 ## dmf results 
 dmf_results <- gompertztrunc::gompertz_mle(death_age ~ educ_yrs, data = dmf %>% filter(byear %in% 1910:1920), left_trunc = 1975, right_trunc = 2005, weights = weight_conservative)
 
-gompertztrunc::convert_hazards_to_ex(dmf_results$results, M = 74.87271928, b = 0.08175947, age = 35)
+gompertztrunc::convert_hazards_to_ex(dmf_results$results, age = 35)
 ```
 
 
