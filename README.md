@@ -13,7 +13,7 @@ The this repository includes code to replicate all figures and tables in the pap
 
 #### Data 
 
-Please download all data for replication from the project's [OSF project](https://osf.io/aecwn/). The data were originally obtained from: 
+Please download all data for replication from the project's [OSF project](https://doi.org/10.17605/OSF.IO/D6QHF). The data were originally obtained from: 
 
 - IPUMS-USA [[link](https://usa.ipums.org/usa/)]
 - CenSoc [[link](https://censoc.berkeley.edu/)]
