@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Figure 5: Education and Longevity"
 author: Casey Breen 
 ---
 
@@ -125,3 +125,6 @@ ggsave(
   height = 6, width = 8
 )
 ```
+
+
+
